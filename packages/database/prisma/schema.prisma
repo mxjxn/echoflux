@@ -1,0 +1,46 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String     @id @default(cuid())
+  username  String     @unique
+  createdAt DateTime   @default(now())
+  sequences Sequence[]
+}
+
+model Sequence {
+  id          String   @id @default(cuid())
+  name        String
+  synthName   String
+  bpm         Int      @default(120)
+  notes       String   // JSON stringified Note[]
+  synthParams String   // JSON stringified SynthParams
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Author relationship
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id])
+
+  // Remix tracking
+  parentId    String?
+  parent      Sequence?  @relation("SequenceRemixes", fields: [parentId], references: [id])
+  remixes     Sequence[] @relation("SequenceRemixes")
+
+  // Engagement
+  playCount   Int      @default(0)
+  remixCount  Int      @default(0)
+
+  @@index([authorId])
+  @@index([createdAt])
+  @@index([parentId])
+}
