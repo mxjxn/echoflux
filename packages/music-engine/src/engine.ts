@@ -1,41 +1,71 @@
 import { Note, Sequence, SynthParams, EngineState } from './types';
 
 /**
- * MusicEngine wraps SuperSonic and provides a high-level API for the sequencer
- *
- * Note: This is a simplified implementation for the prototype.
- * SuperSonic integration will be added once the package is properly installed.
+ * MusicEngine wraps SuperSonic (SuperCollider scsynth WASM)
+ * and provides a high-level API for music synthesis via OSC
  */
 export class MusicEngine {
   private state: EngineState = 'uninitialized';
-  private audioContext: AudioContext | null = null;
+  private sonic: any = null; // SuperSonic instance
   private isPlaying = false;
   private currentStep = 0;
   private intervalId: number | null = null;
   private sequence: Sequence | null = null;
   private onStepCallback?: (step: number) => void;
+  private nextNodeId: number = 1000; // Track synth node IDs
 
   constructor() {
-    if (typeof window !== 'undefined') {
-      this.audioContext = new AudioContext();
-    }
+    // SuperSonic will be initialized in init()
   }
 
   /**
-   * Initialize the audio engine
+   * Initialize the SuperSonic audio engine with OSC
    */
   async init(): Promise<void> {
     try {
       this.state = 'initializing';
 
-      // In a real implementation, we would initialize SuperSonic here:
-      // const sonic = new SuperSonic({...});
-      // await sonic.init();
-      // await sonic.loadSynthDefs([...]);
+      // Check if we're in a browser environment
+      if (typeof window === 'undefined') {
+        console.warn('SuperSonic requires browser environment');
+        this.state = 'ready'; // Allow non-browser usage for testing
+        return;
+      }
 
-      // For now, we'll use Web Audio API directly as a placeholder
-      if (this.audioContext) {
-        await this.audioContext.resume();
+      try {
+        // Try to load SuperSonic dynamically
+        const { SuperSonic } = await import('supersonic-scsynth');
+
+        // Initialize SuperSonic with proper paths
+        // Note: These paths need to be served with proper COOP/COEP headers
+        this.sonic = new SuperSonic({
+          workerBaseURL: '/supersonic/workers/',
+          wasmBaseURL: '/supersonic/wasm/',
+          synthdefBaseURL: '/supersonic/synthdefs/',
+          sampleBaseURL: '/supersonic/samples/',
+        });
+
+        // Initialize the engine
+        await this.sonic.init();
+
+        // Load common Sonic Pi synthdefs via OSC
+        const commonSynths = [
+          'sonic-pi-beep',
+          'sonic-pi-saw',
+          'sonic-pi-pulse',
+          'sonic-pi-tb303',
+          'sonic-pi-prophet',
+        ];
+
+        await this.sonic.loadSynthDefs(commonSynths);
+
+        // Enable OSC notifications
+        this.sonic.send('/notify', 1);
+
+        console.log('SuperSonic initialized with OSC support');
+      } catch (err) {
+        console.warn('SuperSonic not available, using fallback mode:', err);
+        // Fallback: no audio but won't crash
       }
 
       this.state = 'ready';
@@ -92,7 +122,7 @@ export class MusicEngine {
    * Play a specific step
    */
   private playStep(step: number): void {
-    if (!this.sequence || !this.audioContext) return;
+    if (!this.sequence) return;
 
     const notesAtStep = this.sequence.notes.filter((note) => note.step === step);
 
@@ -102,33 +132,102 @@ export class MusicEngine {
   }
 
   /**
-   * Play a single note using Web Audio API (placeholder for SuperSonic)
+   * Play a single note using SuperSonic OSC messages
    */
   private playNote(note: Note): void {
-    if (!this.audioContext) return;
+    if (!this.sonic) {
+      console.warn('SuperSonic not initialized');
+      return;
+    }
 
     const frequency = this.midiToFrequency(note.pitch);
-    const velocity = note.velocity / 127;
-    const duration = (60 / (this.sequence?.bpm || 120)) * (note.duration / 4);
+    const amp = note.velocity / 127;
+    const synthName = this.sequence?.synthName || 'sonic-pi-beep';
 
-    // Create a simple oscillator (will be replaced with SuperSonic synths)
-    const oscillator = this.audioContext.createOscillator();
-    const gainNode = this.audioContext.createGain();
+    // Get a unique node ID for this synth instance
+    const nodeId = this.nextNodeId++;
 
-    oscillator.type = 'sine';
-    oscillator.frequency.setValueAtTime(frequency, this.audioContext.currentTime);
-
-    gainNode.gain.setValueAtTime(velocity * 0.3, this.audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(
-      0.01,
-      this.audioContext.currentTime + duration
+    // Send OSC message to create synth: /s_new
+    // Args: synthName, nodeId, addAction, targetId, ...params
+    this.sonic.send(
+      '/s_new',
+      synthName,
+      nodeId,
+      0, // addAction: 0 = add to head
+      0, // targetId: 0 = default group
+      'note', note.pitch,
+      'amp', amp,
+      'pan', 0
     );
 
-    oscillator.connect(gainNode);
-    gainNode.connect(this.audioContext.destination);
+    // Auto-free the synth node after it finishes
+    // Most Sonic Pi synths have envelope that auto-releases
+  }
 
-    oscillator.start(this.audioContext.currentTime);
-    oscillator.stop(this.audioContext.currentTime + duration);
+  /**
+   * Trigger a synth with parameters via OSC
+   */
+  public triggerSynth(
+    synthName: string,
+    params: { [key: string]: number }
+  ): number {
+    if (!this.sonic) {
+      console.warn('SuperSonic not initialized');
+      return -1;
+    }
+
+    const nodeId = this.nextNodeId++;
+
+    // Build OSC message arguments
+    const args: any[] = [
+      '/s_new',
+      synthName,
+      nodeId,
+      0, // addAction
+      0, // targetId
+    ];
+
+    // Add all parameters as key-value pairs
+    for (const [key, value] of Object.entries(params)) {
+      args.push(key, value);
+    }
+
+    // Send OSC message to scsynth
+    this.sonic.send(...args);
+
+    return nodeId;
+  }
+
+  /**
+   * Free a synth node via OSC
+   */
+  public freeSynth(nodeId: number): void {
+    if (!this.sonic) return;
+
+    // Send OSC message to free the node
+    this.sonic.send('/n_free', nodeId);
+  }
+
+  /**
+   * Set parameters on a running synth via OSC
+   */
+  public setSynthParam(nodeId: number, param: string, value: number): void {
+    if (!this.sonic) return;
+
+    // Send OSC message to set node parameter
+    this.sonic.send('/n_set', nodeId, param, value);
+  }
+
+  /**
+   * Send raw OSC message to scsynth
+   */
+  public sendOSC(address: string, ...args: any[]): void {
+    if (!this.sonic) {
+      console.warn('SuperSonic not initialized');
+      return;
+    }
+
+    this.sonic.send(address, ...args);
   }
 
   /**

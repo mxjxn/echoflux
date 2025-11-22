@@ -185,7 +185,7 @@ export function setupMusicStdlib(env: Environment, engine: MusicEngine): void {
 
   /**
    * (play-note note-or-freq)
-   * Play a single note immediately
+   * Play a single note immediately via OSC
    */
   env.set('play-note', {
     type: 'function',
@@ -198,8 +198,159 @@ export function setupMusicStdlib(env: Environment, engine: MusicEngine): void {
         throw new Error('play-note requires a number (MIDI note or frequency)');
       }
 
-      // TODO: Integrate with SuperSonic to play note
-      console.log(`Playing note: ${note.value}`);
+      // Trigger synth via OSC using the engine
+      const nodeId = engine.triggerSynth('sonic-pi-beep', {
+        note: note.value,
+        amp: 0.5,
+        pan: 0,
+      });
+
+      return { type: 'number', value: nodeId };
+    },
+  } as any);
+
+  /**
+   * (synth synth-name {params})
+   * Trigger a synth with parameters via OSC
+   * Example: (synth :beep {:note 60 :amp 0.5})
+   */
+  env.set('synth', {
+    type: 'function',
+    params: ['name', 'params'],
+    body: { type: 'symbol', value: '__native__' },
+    closure: env,
+    name: 'synth',
+    __native__: (name: RuntimeValue, params?: RuntimeValue): RuntimeValue => {
+      if (name.type !== 'keyword' && name.type !== 'string') {
+        throw new Error('synth requires a keyword or string as synth name');
+      }
+
+      // Default synth name mapping
+      let synthName = name.value;
+      if (!synthName.startsWith('sonic-pi-')) {
+        synthName = `sonic-pi-${synthName}`;
+      }
+
+      // Extract parameters from map
+      const synthParams: { [key: string]: number } = {};
+
+      if (params) {
+        if (params.type === 'map') {
+          for (const [key, value] of params.pairs.entries()) {
+            // Remove ':' prefix from keyword keys
+            const paramName = key.startsWith(':') ? key.substring(1) : key;
+
+            if (value.type === 'number') {
+              synthParams[paramName] = value.value;
+            }
+          }
+        } else {
+          throw new Error('synth params must be a map');
+        }
+      }
+
+      // Trigger synth via OSC
+      const nodeId = engine.triggerSynth(synthName, synthParams);
+
+      return { type: 'number', value: nodeId };
+    },
+  } as any);
+
+  /**
+   * (free node-id)
+   * Free a synth node via OSC
+   */
+  env.set('free', {
+    type: 'function',
+    params: ['node-id'],
+    body: { type: 'symbol', value: '__native__' },
+    closure: env,
+    name: 'free',
+    __native__: (nodeId: RuntimeValue): RuntimeValue => {
+      if (nodeId.type !== 'number') {
+        throw new Error('free requires a number (node ID)');
+      }
+
+      engine.freeSynth(nodeId.value);
+
+      return { type: 'nil' };
+    },
+  } as any);
+
+  /**
+   * (set-param node-id param-name value)
+   * Set a parameter on a running synth via OSC
+   */
+  env.set('set-param', {
+    type: 'function',
+    params: ['node-id', 'param', 'value'],
+    body: { type: 'symbol', value: '__native__' },
+    closure: env,
+    name: 'set-param',
+    __native__: (nodeId: RuntimeValue, param: RuntimeValue, value: RuntimeValue): RuntimeValue => {
+      if (nodeId.type !== 'number') {
+        throw new Error('set-param requires a number as node ID');
+      }
+
+      if (param.type !== 'keyword' && param.type !== 'string') {
+        throw new Error('set-param requires a keyword or string as param name');
+      }
+
+      if (value.type !== 'number') {
+        throw new Error('set-param requires a number as value');
+      }
+
+      const paramName = param.value;
+      engine.setSynthParam(nodeId.value, paramName, value.value);
+
+      return { type: 'nil' };
+    },
+  } as any);
+
+  /**
+   * (osc address ...args)
+   * Send raw OSC message to scsynth
+   * Example: (osc "/s_new" "sonic-pi-beep" -1 0 0 "note" 60)
+   */
+  env.set('osc', {
+    type: 'function',
+    params: [],
+    body: { type: 'symbol', value: '__native__' },
+    closure: env,
+    name: 'osc',
+    __native__: (...args: RuntimeValue[]): RuntimeValue => {
+      if (args.length === 0) {
+        throw new Error('osc requires at least an address argument');
+      }
+
+      const address = args[0];
+      if (address.type !== 'string' && address.type !== 'keyword') {
+        throw new Error('osc address must be a string or keyword');
+      }
+
+      // Convert runtime values to native types for OSC
+      const oscArgs: any[] = [address.value];
+
+      for (let i = 1; i < args.length; i++) {
+        const arg = args[i];
+        switch (arg.type) {
+          case 'number':
+            oscArgs.push(arg.value);
+            break;
+          case 'string':
+            oscArgs.push(arg.value);
+            break;
+          case 'keyword':
+            oscArgs.push(arg.value);
+            break;
+          default:
+            throw new Error(`Cannot convert ${arg.type} to OSC argument`);
+        }
+      }
+
+      // Send raw OSC message
+      const [addr, ...rest] = oscArgs;
+      engine.sendOSC(addr, ...rest);
 
       return { type: 'nil' };
     },
@@ -220,7 +371,7 @@ export function setupMusicStdlib(env: Environment, engine: MusicEngine): void {
         throw new Error('sleep requires a number');
       }
 
-      // Note: In a real implementation, this would integrate with the scheduler
+      // Note: This is a placeholder - real scheduling would need a proper scheduler
       console.log(`Sleep for ${duration.value} seconds`);
 
       return { type: 'nil' };
