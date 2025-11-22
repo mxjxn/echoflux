@@ -9,7 +9,10 @@
     "dev": "tsc --watch",
     "clean": "rm -rf dist"
   },
-  "dependencies": {},
+  "dependencies": {
+    "supersonic-scsynth": "^0.6.0",
+    "supersonic-scsynth-synthdefs": "^0.6.0"
+  },
   "devDependencies": {
     "typescript": "^5.3.3"
   }

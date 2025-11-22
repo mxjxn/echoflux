@@ -1,33 +1,16 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
 import { useSequencerStore } from '@/lib/store';
 
-export function TransportControls() {
-  const { sequence, isPlaying, setIsPlaying, setCurrentStep, currentStep, clearSequence } =
+interface TransportControlsProps {
+  audioReady: boolean;
+  audioLoading: boolean;
+  audioError: string | null;
+}
+
+export function TransportControls({ audioReady, audioLoading, audioError }: TransportControlsProps) {
+  const { sequence, isPlaying, setIsPlaying, setCurrentStep, clearSequence } =
     useSequencerStore();
-  const intervalRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (isPlaying) {
-      const stepDuration = (60 / sequence.bpm) * 1000 / 4; // 16th notes
-
-      intervalRef.current = window.setInterval(() => {
-        setCurrentStep((currentStep + 1) % 16);
-      }, stepDuration);
-    } else {
-      if (intervalRef.current !== null) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    }
-
-    return () => {
-      if (intervalRef.current !== null) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [isPlaying, sequence.bpm, currentStep, setCurrentStep]);
 
   const handlePlayPause = () => {
     if (isPlaying) {
@@ -60,41 +43,64 @@ export function TransportControls() {
   };
 
   return (
-    <div className="flex items-center gap-4">
-      {/* Play/Pause */}
-      <button
-        onClick={handlePlayPause}
-        className={`
-          px-6 py-3 rounded-lg font-semibold transition
-          ${
-            isPlaying
-              ? 'bg-red-600 hover:bg-red-700'
-              : 'bg-primary hover:bg-primary/80'
-          }
-        `}
-      >
-        {isPlaying ? '⏸ Pause' : '▶ Play'}
-      </button>
+    <div className="space-y-4">
+      {/* Audio Engine Status */}
+      {audioLoading && (
+        <div className="px-4 py-2 rounded bg-yellow-900/20 border border-yellow-600/50 text-yellow-200 text-sm">
+          ⚡ Loading audio engine...
+        </div>
+      )}
 
-      {/* Clear */}
-      <button
-        onClick={clearSequence}
-        className="px-6 py-3 rounded-lg bg-surface hover:bg-surfaceLight transition"
-      >
-        Clear
-      </button>
+      {audioError && (
+        <div className="px-4 py-2 rounded bg-red-900/20 border border-red-600/50 text-red-200 text-sm">
+          ⚠️ Audio engine error: {audioError}
+        </div>
+      )}
 
-      {/* Save */}
-      <button
-        onClick={handleSave}
-        className="px-6 py-3 rounded-lg bg-secondary hover:bg-secondary/80 transition font-semibold"
-      >
-        Save to Feed
-      </button>
+      {audioReady && !isPlaying && (
+        <div className="px-4 py-2 rounded bg-green-900/20 border border-green-600/50 text-green-200 text-sm">
+          ✓ Audio engine ready
+        </div>
+      )}
 
-      {/* Info */}
-      <div className="ml-auto text-sm text-gray-400">
-        Notes: {sequence.notes.length}
+      <div className="flex items-center gap-4">
+        {/* Play/Pause */}
+        <button
+          onClick={handlePlayPause}
+          disabled={!audioReady}
+          className={`
+            px-6 py-3 rounded-lg font-semibold transition
+            ${
+              isPlaying
+                ? 'bg-red-600 hover:bg-red-700'
+                : 'bg-primary hover:bg-primary/80'
+            }
+            ${!audioReady ? 'opacity-50 cursor-not-allowed' : ''}
+          `}
+        >
+          {isPlaying ? '⏸ Pause' : '▶ Play'}
+        </button>
+
+        {/* Clear */}
+        <button
+          onClick={clearSequence}
+          className="px-6 py-3 rounded-lg bg-surface hover:bg-surfaceLight transition"
+        >
+          Clear
+        </button>
+
+        {/* Save */}
+        <button
+          onClick={handleSave}
+          className="px-6 py-3 rounded-lg bg-secondary hover:bg-secondary/80 transition font-semibold"
+        >
+          Save to Feed
+        </button>
+
+        {/* Info */}
+        <div className="ml-auto text-sm text-gray-400">
+          Notes: {sequence.notes.length}
+        </div>
       </div>
     </div>
   );

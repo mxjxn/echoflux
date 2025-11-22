@@ -5,9 +5,11 @@ import { StepSequencer } from '@/components/StepSequencer';
 import { SynthControls } from '@/components/SynthControls';
 import { TransportControls } from '@/components/TransportControls';
 import { useSequencerStore } from '@/lib/store';
+import { useAudioEngine } from '@/hooks/useAudioEngine';
 
 export default function SequencerPage() {
   const { sequence } = useSequencerStore();
+  const { ready, loading, error } = useAudioEngine();
 
   return (
     <main className="min-h-screen bg-background">
@@ -64,7 +66,11 @@ export default function SequencerPage() {
             </div>
 
             <div className="p-6 rounded-lg bg-surface border border-surfaceLight">
-              <TransportControls />
+              <TransportControls
+                audioReady={ready}
+                audioLoading={loading}
+                audioError={error}
+              />
             </div>
           </div>
 
