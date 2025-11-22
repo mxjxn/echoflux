@@ -35,6 +35,12 @@ export default function SequencerPage() {
               >
                 Feed
               </Link>
+              <Link
+                href="/jam"
+                className="px-4 py-2 rounded-lg bg-surface hover:bg-surfaceLight transition"
+              >
+                Jam
+              </Link>
             </nav>
           </div>
         </div>
