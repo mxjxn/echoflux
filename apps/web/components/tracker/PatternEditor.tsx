@@ -18,6 +18,7 @@ export function PatternEditor() {
     selectedInstrument,
     currentOctave,
     collapsedColumns,
+    editStep,
     moveCursor,
     setMode,
     setCurrentNote,
@@ -38,7 +39,16 @@ export function PatternEditor() {
     isColumnCollapsed,
     exportSong,
     importSong,
+    incrementEditStep,
+    decrementEditStep,
   } = useTrackerStore();
+
+  // Helper to move cursor by edit step
+  const moveByEditStep = () => {
+    for (let i = 0; i < editStep; i++) {
+      moveCursor({ type: 'MOVE_DOWN' });
+    }
+  };
 
   const handleExport = () => {
     const json = exportSong();
@@ -134,6 +144,18 @@ export function PatternEditor() {
           return;
         }
 
+        // + - increase edit step
+        if (e.key === '+' || e.key === '=') {
+          incrementEditStep();
+          return;
+        }
+
+        // - - decrease edit step
+        if (e.key === '-' || e.key === '_') {
+          decrementEditStep();
+          return;
+        }
+
         const action = parseNormalModeKey(e.key, e.shiftKey);
         if (action) {
           if (action.type === 'ENTER_INSERT') {
@@ -159,6 +181,13 @@ export function PatternEditor() {
 
         // Handle note input in insert mode
         if (cursor.column === 'note') {
+          // Shift+1 for note off
+          if (e.shiftKey && e.key === '!') {
+            setCurrentNote({ note: 'OFF', octave: 0 });
+            moveByEditStep();
+            return;
+          }
+
           const noteMapping = KEY_TO_NOTE[e.key.toLowerCase()];
           if (noteMapping) {
             setCurrentNote({
@@ -170,7 +199,7 @@ export function PatternEditor() {
             if (currentTrackCell.instrument === null) {
               setCurrentInstrument(selectedInstrument);
             }
-            moveCursor({ type: 'MOVE_DOWN' });
+            moveByEditStep();
           } else if (e.key === 'Delete' || e.key === 'Backspace') {
             setCurrentNote(null);
           }
@@ -181,7 +210,7 @@ export function PatternEditor() {
           const num = parseInt(e.key);
           if (!isNaN(num) && num < song.instruments.length) {
             setCurrentInstrument(num);
-            moveCursor({ type: 'MOVE_DOWN' });
+            moveByEditStep();
           } else if (e.key === 'Delete' || e.key === 'Backspace') {
             setCurrentInstrument(null);
           }
@@ -240,6 +269,7 @@ export function PatternEditor() {
     pattern,
     selectedInstrument,
     currentOctave,
+    editStep,
     song.instruments.length,
     moveCursor,
     setMode,
@@ -261,6 +291,9 @@ export function PatternEditor() {
     isColumnCollapsed,
     exportSong,
     importSong,
+    incrementEditStep,
+    decrementEditStep,
+    moveByEditStep,
   ]);
 
   // Auto-scroll to keep cursor visible
@@ -348,6 +381,9 @@ export function PatternEditor() {
           </span>
           <span className="text-gray-400">
             Octave: {currentOctave}
+          </span>
+          <span className="text-gray-400">
+            Step: {editStep}
           </span>
         </div>
       </div>
@@ -511,11 +547,11 @@ export function PatternEditor() {
       <div className="px-4 py-2 bg-gray-800 border-t border-gray-700 text-xs text-gray-400">
         {mode === 'normal' ? (
           <span>
-            <kbd>h/j/k/l</kbd> move • <kbd>Shift+H/L</kbd> track • <kbd>i</kbd> insert • <kbd>x</kbd> delete • <kbd>yy</kbd> copy • <kbd>p</kbd> paste • <kbd>o</kbd> insert row • <kbd>dd</kbd> delete row • <kbd>*//</kbd> octave
+            <kbd>h/j/k/l</kbd> move • <kbd>Shift+H/L</kbd> track • <kbd>i</kbd> insert • <kbd>x</kbd> delete • <kbd>yy</kbd> copy • <kbd>p</kbd> paste • <kbd>o</kbd> insert row • <kbd>dd</kbd> delete row • <kbd>*//</kbd> octave • <kbd>+/-</kbd> step
           </span>
         ) : (
           <span>
-            Type notes (QWERTY keys) • <kbd>Esc</kbd> to exit insert mode • <kbd>Tab</kbd> to next column
+            Type notes (QWERTY keys) • <kbd>Shift+1</kbd> note off • <kbd>Esc</kbd> to exit • <kbd>Tab</kbd> next column
           </span>
         )}
       </div>

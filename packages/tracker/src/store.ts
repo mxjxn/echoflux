@@ -82,6 +82,11 @@ interface TrackerActions {
   // Export/Import
   exportSong: () => string;
   importSong: (json: string) => void;
+
+  // Edit step
+  setEditStep: (step: number) => void;
+  incrementEditStep: () => void;
+  decrementEditStep: () => void;
 }
 
 const createEmptyTrackCell = (): TrackCell => ({
@@ -156,6 +161,7 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
   clipboard: null,
   currentOctave: 4,
   collapsedColumns: {},
+  editStep: 1,
 
   // Mode actions
   setMode: (mode) => set({ mode }),
@@ -516,4 +522,11 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
       throw err;
     }
   },
+
+  // Edit step
+  setEditStep: (step) => set({ editStep: Math.max(0, Math.min(16, step)) }),
+  incrementEditStep: () =>
+    set((state) => ({ editStep: Math.min(16, state.editStep + 1) })),
+  decrementEditStep: () =>
+    set((state) => ({ editStep: Math.max(0, state.editStep - 1) })),
 }));

@@ -88,4 +88,5 @@ export interface TrackerState {
   clipboard: TrackCell | null;
   currentOctave: number; // 0-8
   collapsedColumns: Record<number, Set<ColumnType>>; // track index -> collapsed columns
+  editStep: number; // How many rows to advance after note entry (0-16)
 }
