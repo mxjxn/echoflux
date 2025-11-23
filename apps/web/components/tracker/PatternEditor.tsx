@@ -7,6 +7,7 @@ import type { PatternRow } from '@echoflux/tracker';
 
 export function PatternEditor() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const lastKeyRef = useRef<string>('');
   const {
     song,
     mode,
@@ -15,6 +16,7 @@ export function PatternEditor() {
     currentPlayRow,
     isPlaying,
     selectedInstrument,
+    currentOctave,
     moveCursor,
     setMode,
     setCurrentNote,
@@ -23,6 +25,12 @@ export function PatternEditor() {
     setCurrentPanning,
     setCurrentDelay,
     clearRow,
+    copyRow,
+    pasteRow,
+    insertRow,
+    deleteRow,
+    incrementOctave,
+    decrementOctave,
   } = useTrackerStore();
 
   const pattern = song.patterns[currentPattern];
@@ -39,6 +47,53 @@ export function PatternEditor() {
       }
 
       if (mode === 'normal') {
+        // Handle double-key sequences (yy, dd)
+        if (e.key === 'y' && lastKeyRef.current === 'y') {
+          // yy - copy row
+          copyRow(cursor.row);
+          lastKeyRef.current = '';
+          return;
+        } else if (e.key === 'y') {
+          lastKeyRef.current = 'y';
+          return;
+        } else if (e.key === 'd' && lastKeyRef.current === 'd') {
+          // dd - delete row
+          deleteRow(cursor.row);
+          lastKeyRef.current = '';
+          return;
+        } else if (e.key === 'd') {
+          lastKeyRef.current = 'd';
+          return;
+        } else {
+          lastKeyRef.current = '';
+        }
+
+        // p - paste row
+        if (e.key === 'p') {
+          pasteRow(cursor.row);
+          moveCursor({ type: 'MOVE_DOWN' });
+          return;
+        }
+
+        // o - insert row
+        if (e.key === 'o') {
+          insertRow(cursor.row + 1);
+          moveCursor({ type: 'MOVE_DOWN' });
+          return;
+        }
+
+        // * - octave up
+        if (e.key === '*') {
+          incrementOctave();
+          return;
+        }
+
+        // / - octave down
+        if (e.key === '/') {
+          decrementOctave();
+          return;
+        }
+
         const action = parseNormalModeKey(e.key, e.shiftKey);
         if (action) {
           if (action.type === 'ENTER_INSERT') {
@@ -68,7 +123,7 @@ export function PatternEditor() {
           if (noteMapping) {
             setCurrentNote({
               note: noteMapping.note,
-              octave: 4 + noteMapping.octave,
+              octave: currentOctave + noteMapping.octave,
             });
             // Auto-set current instrument if not set
             const currentRow = pattern.rows[cursor.row];
@@ -144,6 +199,7 @@ export function PatternEditor() {
     cursor,
     pattern,
     selectedInstrument,
+    currentOctave,
     song.instruments.length,
     moveCursor,
     setMode,
@@ -153,6 +209,12 @@ export function PatternEditor() {
     setCurrentPanning,
     setCurrentDelay,
     clearRow,
+    copyRow,
+    pasteRow,
+    insertRow,
+    deleteRow,
+    incrementOctave,
+    decrementOctave,
   ]);
 
   // Auto-scroll to keep cursor visible
@@ -216,6 +278,9 @@ export function PatternEditor() {
           </span>
           <span className="text-gray-400">
             Row: {cursor.row.toString().padStart(2, '0')} / {pattern.length}
+          </span>
+          <span className="text-gray-400">
+            Octave: {currentOctave}
           </span>
         </div>
       </div>
@@ -343,7 +408,7 @@ export function PatternEditor() {
       <div className="px-4 py-2 bg-gray-800 border-t border-gray-700 text-xs text-gray-400">
         {mode === 'normal' ? (
           <span>
-            <kbd>h/j/k/l</kbd> or arrows to move • <kbd>i</kbd> to insert • <kbd>x</kbd> to delete
+            <kbd>h/j/k/l</kbd> move • <kbd>i</kbd> insert • <kbd>x</kbd> delete • <kbd>yy</kbd> copy • <kbd>p</kbd> paste • <kbd>o</kbd> insert row • <kbd>dd</kbd> delete row • <kbd>*//</kbd> octave +/-
           </span>
         ) : (
           <span>

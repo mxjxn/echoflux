@@ -79,4 +79,6 @@ export interface TrackerState {
   isPlaying: boolean;
   currentPlayRow: number;
   selectedInstrument: number;
+  clipboard: PatternRow | null;
+  currentOctave: number; // 0-8
 }
