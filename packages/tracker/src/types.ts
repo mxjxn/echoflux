@@ -23,7 +23,7 @@ export interface Note {
   octave: number; // 0-8
 }
 
-export interface PatternRow {
+export interface TrackCell {
   note: Note | null;
   instrument: number | null; // Index into instrument list
   volume: number | null; // 0-127
@@ -32,11 +32,16 @@ export interface PatternRow {
   effect: string | null; // Effect command (e.g., "0100" for arpeggio)
 }
 
+export interface PatternRow {
+  tracks: TrackCell[]; // Array of tracks (channels)
+}
+
 export interface Pattern {
   id: string;
   name: string;
   rows: PatternRow[];
   length: number; // Number of rows (typically 64)
+  numTracks: number; // Number of tracks/channels
 }
 
 export interface Instrument {
@@ -68,6 +73,7 @@ export type ColumnType = 'note' | 'instrument' | 'volume' | 'panning' | 'delay' 
 export interface CursorPosition {
   row: number;
   pattern: number;
+  track: number; // Which track/channel (0-based)
   column: ColumnType;
 }
 
@@ -79,6 +85,7 @@ export interface TrackerState {
   isPlaying: boolean;
   currentPlayRow: number;
   selectedInstrument: number;
-  clipboard: PatternRow | null;
+  clipboard: TrackCell | null;
   currentOctave: number; // 0-8
+  collapsedColumns: Record<number, Set<ColumnType>>; // track index -> collapsed columns
 }

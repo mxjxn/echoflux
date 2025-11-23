@@ -70,19 +70,32 @@ interface TrackerActions {
   pasteRow: (row: number) => void;
   insertRow: (row: number) => void;
   deleteRow: (row: number) => void;
+
+  // Track management
+  addTrack: (patternIndex: number) => void;
+  removeTrack: (patternIndex: number, trackIndex: number) => void;
+
+  // Column collapse
+  toggleColumnCollapse: (track: number, column: ColumnType) => void;
+  isColumnCollapsed: (track: number, column: ColumnType) => boolean;
 }
 
-const createEmptyPattern = (id: string, length: number = 64): Pattern => ({
+const createEmptyTrackCell = (): TrackCell => ({
+  note: null,
+  instrument: null,
+  volume: null,
+  panning: null,
+  delay: null,
+  effect: null,
+});
+
+const createEmptyPattern = (id: string, length: number = 64, numTracks: number = 4): Pattern => ({
   id,
   name: `Pattern ${id}`,
   length,
+  numTracks,
   rows: Array.from({ length }, () => ({
-    note: null,
-    instrument: null,
-    volume: null,
-    panning: null,
-    delay: null,
-    effect: null,
+    tracks: Array.from({ length: numTracks }, createEmptyTrackCell),
   })),
 });
 
@@ -129,6 +142,7 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
   cursor: {
     row: 0,
     pattern: 0,
+    track: 0,
     column: 'note' as ColumnType,
   },
   currentPattern: 0,
@@ -137,6 +151,7 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
   selectedInstrument: 0,
   clipboard: null,
   currentOctave: 4,
+  collapsedColumns: {},
 
   // Mode actions
   setMode: (mode) => set({ mode }),
@@ -164,10 +179,13 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
   // Pattern editing
   setNote: (row, note) =>
     set((state) => {
+      const { cursor } = state;
       const newSong = { ...state.song };
       const pattern = { ...newSong.patterns[state.currentPattern] };
       const rows = [...pattern.rows];
-      rows[row] = { ...rows[row], note };
+      const tracks = [...rows[row].tracks];
+      tracks[cursor.track] = { ...tracks[cursor.track], note };
+      rows[row] = { tracks };
       pattern.rows = rows;
       newSong.patterns = [...newSong.patterns];
       newSong.patterns[state.currentPattern] = pattern;
@@ -176,10 +194,13 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
 
   setInstrument: (row, instrument) =>
     set((state) => {
+      const { cursor } = state;
       const newSong = { ...state.song };
       const pattern = { ...newSong.patterns[state.currentPattern] };
       const rows = [...pattern.rows];
-      rows[row] = { ...rows[row], instrument };
+      const tracks = [...rows[row].tracks];
+      tracks[cursor.track] = { ...tracks[cursor.track], instrument };
+      rows[row] = { tracks };
       pattern.rows = rows;
       newSong.patterns = [...newSong.patterns];
       newSong.patterns[state.currentPattern] = pattern;
@@ -188,10 +209,13 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
 
   setVolume: (row, volume) =>
     set((state) => {
+      const { cursor } = state;
       const newSong = { ...state.song };
       const pattern = { ...newSong.patterns[state.currentPattern] };
       const rows = [...pattern.rows];
-      rows[row] = { ...rows[row], volume };
+      const tracks = [...rows[row].tracks];
+      tracks[cursor.track] = { ...tracks[cursor.track], volume };
+      rows[row] = { tracks };
       pattern.rows = rows;
       newSong.patterns = [...newSong.patterns];
       newSong.patterns[state.currentPattern] = pattern;
@@ -200,10 +224,13 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
 
   setPanning: (row, panning) =>
     set((state) => {
+      const { cursor } = state;
       const newSong = { ...state.song };
       const pattern = { ...newSong.patterns[state.currentPattern] };
       const rows = [...pattern.rows];
-      rows[row] = { ...rows[row], panning };
+      const tracks = [...rows[row].tracks];
+      tracks[cursor.track] = { ...tracks[cursor.track], panning };
+      rows[row] = { tracks };
       pattern.rows = rows;
       newSong.patterns = [...newSong.patterns];
       newSong.patterns[state.currentPattern] = pattern;
@@ -212,10 +239,13 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
 
   setDelay: (row, delay) =>
     set((state) => {
+      const { cursor } = state;
       const newSong = { ...state.song };
       const pattern = { ...newSong.patterns[state.currentPattern] };
       const rows = [...pattern.rows];
-      rows[row] = { ...rows[row], delay };
+      const tracks = [...rows[row].tracks];
+      tracks[cursor.track] = { ...tracks[cursor.track], delay };
+      rows[row] = { tracks };
       pattern.rows = rows;
       newSong.patterns = [...newSong.patterns];
       newSong.patterns[state.currentPattern] = pattern;
@@ -224,10 +254,13 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
 
   setEffect: (row, effect) =>
     set((state) => {
+      const { cursor } = state;
       const newSong = { ...state.song };
       const pattern = { ...newSong.patterns[state.currentPattern] };
       const rows = [...pattern.rows];
-      rows[row] = { ...rows[row], effect };
+      const tracks = [...rows[row].tracks];
+      tracks[cursor.track] = { ...tracks[cursor.track], effect };
+      rows[row] = { tracks };
       pattern.rows = rows;
       newSong.patterns = [...newSong.patterns];
       newSong.patterns[state.currentPattern] = pattern;
@@ -236,17 +269,13 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
 
   clearRow: (row) =>
     set((state) => {
+      const { cursor } = state;
       const newSong = { ...state.song };
       const pattern = { ...newSong.patterns[state.currentPattern] };
       const rows = [...pattern.rows];
-      rows[row] = {
-        note: null,
-        instrument: null,
-        volume: null,
-        panning: null,
-        delay: null,
-        effect: null,
-      };
+      const tracks = [...rows[row].tracks];
+      tracks[cursor.track] = createEmptyTrackCell();
+      rows[row] = { tracks };
       pattern.rows = rows;
       newSong.patterns = [...newSong.patterns];
       newSong.patterns[state.currentPattern] = pattern;
@@ -318,7 +347,7 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
   setCurrentPattern: (index) =>
     set({
       currentPattern: index,
-      cursor: { row: 0, pattern: index, column: 'note' },
+      cursor: { row: 0, pattern: index, track: 0, column: 'note' },
     }),
 
   addPattern: (pattern) =>
@@ -348,17 +377,20 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
   copyRow: (row) =>
     set((state) => {
       const pattern = state.song.patterns[state.currentPattern];
-      const rowData = { ...pattern.rows[row] };
-      return { clipboard: rowData };
+      const trackData = { ...pattern.rows[row].tracks[state.cursor.track] };
+      return { clipboard: trackData };
     }),
 
   pasteRow: (row) =>
     set((state) => {
       if (!state.clipboard) return state;
+      const { cursor } = state;
       const newSong = { ...state.song };
       const pattern = { ...newSong.patterns[state.currentPattern] };
       const rows = [...pattern.rows];
-      rows[row] = { ...state.clipboard };
+      const tracks = [...rows[row].tracks];
+      tracks[cursor.track] = { ...state.clipboard };
+      rows[row] = { tracks };
       pattern.rows = rows;
       newSong.patterns = [...newSong.patterns];
       newSong.patterns[state.currentPattern] = pattern;
@@ -372,12 +404,7 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
       const rows = [...pattern.rows];
       // Insert empty row at position
       rows.splice(row, 0, {
-        note: null,
-        instrument: null,
-        volume: null,
-        panning: null,
-        delay: null,
-        effect: null,
+        tracks: Array.from({ length: pattern.numTracks }, createEmptyTrackCell),
       });
       // Remove last row to maintain pattern length
       rows.pop();
@@ -396,16 +423,68 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
       rows.splice(row, 1);
       // Add empty row at end to maintain pattern length
       rows.push({
-        note: null,
-        instrument: null,
-        volume: null,
-        panning: null,
-        delay: null,
-        effect: null,
+        tracks: Array.from({ length: pattern.numTracks }, createEmptyTrackCell),
       });
       pattern.rows = rows;
       newSong.patterns = [...newSong.patterns];
       newSong.patterns[state.currentPattern] = pattern;
       return { song: newSong };
     }),
+
+  // Track management
+  addTrack: (patternIndex) =>
+    set((state) => {
+      const newSong = { ...state.song };
+      const pattern = { ...newSong.patterns[patternIndex] };
+      const rows = pattern.rows.map((row) => ({
+        tracks: [...row.tracks, createEmptyTrackCell()],
+      }));
+      pattern.rows = rows;
+      pattern.numTracks += 1;
+      newSong.patterns = [...newSong.patterns];
+      newSong.patterns[patternIndex] = pattern;
+      return { song: newSong };
+    }),
+
+  removeTrack: (patternIndex, trackIndex) =>
+    set((state) => {
+      const newSong = { ...state.song };
+      const pattern = { ...newSong.patterns[patternIndex] };
+      if (pattern.numTracks <= 1) return state; // Keep at least one track
+      const rows = pattern.rows.map((row) => ({
+        tracks: row.tracks.filter((_, idx) => idx !== trackIndex),
+      }));
+      pattern.rows = rows;
+      pattern.numTracks -= 1;
+      newSong.patterns = [...newSong.patterns];
+      newSong.patterns[patternIndex] = pattern;
+      // Adjust cursor if needed
+      const newCursor = { ...state.cursor };
+      if (newCursor.track >= pattern.numTracks) {
+        newCursor.track = pattern.numTracks - 1;
+      }
+      return { song: newSong, cursor: newCursor };
+    }),
+
+  // Column collapse
+  toggleColumnCollapse: (track, column) =>
+    set((state) => {
+      const newCollapsed = { ...state.collapsedColumns };
+      if (!newCollapsed[track]) {
+        newCollapsed[track] = new Set();
+      }
+      const trackCollapsed = new Set(newCollapsed[track]);
+      if (trackCollapsed.has(column)) {
+        trackCollapsed.delete(column);
+      } else {
+        trackCollapsed.add(column);
+      }
+      newCollapsed[track] = trackCollapsed;
+      return { collapsedColumns: newCollapsed };
+    }),
+
+  isColumnCollapsed: (track, column) => {
+    const state = get();
+    return state.collapsedColumns[track]?.has(column) || false;
+  },
 }));

@@ -3,7 +3,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useTrackerStore } from '@echoflux/tracker';
 import { parseNormalModeKey, parseInsertModeKey, KEY_TO_NOTE } from '@echoflux/tracker';
-import type { PatternRow } from '@echoflux/tracker';
+import type { TrackCell } from '@echoflux/tracker';
 
 export function PatternEditor() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -17,6 +17,7 @@ export function PatternEditor() {
     isPlaying,
     selectedInstrument,
     currentOctave,
+    collapsedColumns,
     moveCursor,
     setMode,
     setCurrentNote,
@@ -31,6 +32,10 @@ export function PatternEditor() {
     deleteRow,
     incrementOctave,
     decrementOctave,
+    addTrack,
+    removeTrack,
+    toggleColumnCollapse,
+    isColumnCollapsed,
   } = useTrackerStore();
 
   const pattern = song.patterns[currentPattern];
@@ -126,8 +131,8 @@ export function PatternEditor() {
               octave: currentOctave + noteMapping.octave,
             });
             // Auto-set current instrument if not set
-            const currentRow = pattern.rows[cursor.row];
-            if (currentRow.instrument === null) {
+            const currentTrackCell = pattern.rows[cursor.row].tracks[cursor.track];
+            if (currentTrackCell.instrument === null) {
               setCurrentInstrument(selectedInstrument);
             }
             moveCursor({ type: 'MOVE_DOWN' });
@@ -151,8 +156,8 @@ export function PatternEditor() {
         if (cursor.column === 'volume') {
           const num = parseInt(e.key);
           if (!isNaN(num)) {
-            const currentRow = pattern.rows[cursor.row];
-            const currentVol = currentRow.volume || 0;
+            const currentTrackCell = pattern.rows[cursor.row].tracks[cursor.track];
+            const currentVol = currentTrackCell.volume || 0;
             const newVol = Math.min(127, (currentVol * 10 + num) % 1000);
             setCurrentVolume(newVol);
           } else if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -164,8 +169,8 @@ export function PatternEditor() {
         if (cursor.column === 'panning') {
           const hexChars = '0123456789abcdefABCDEF';
           if (hexChars.includes(e.key)) {
-            const currentRow = pattern.rows[cursor.row];
-            const currentPan = currentRow.panning || 0;
+            const currentTrackCell = pattern.rows[cursor.row].tracks[cursor.track];
+            const currentPan = currentTrackCell.panning || 0;
             const currentHex = currentPan.toString(16).toUpperCase().padStart(2, '0');
             const newHex = (currentHex.slice(1) + e.key.toUpperCase()).slice(0, 2);
             const newPan = parseInt(newHex, 16);
@@ -179,8 +184,8 @@ export function PatternEditor() {
         if (cursor.column === 'delay') {
           const hexChars = '0123456789abcdefABCDEF';
           if (hexChars.includes(e.key)) {
-            const currentRow = pattern.rows[cursor.row];
-            const currentDel = currentRow.delay || 0;
+            const currentTrackCell = pattern.rows[cursor.row].tracks[cursor.track];
+            const currentDel = currentTrackCell.delay || 0;
             const currentHex = currentDel.toString(16).toUpperCase().padStart(2, '0');
             const newHex = (currentHex.slice(1) + e.key.toUpperCase()).slice(0, 2);
             const newDel = parseInt(newHex, 16);
@@ -215,6 +220,10 @@ export function PatternEditor() {
     deleteRow,
     incrementOctave,
     decrementOctave,
+    addTrack,
+    removeTrack,
+    toggleColumnCollapse,
+    isColumnCollapsed,
   ]);
 
   // Auto-scroll to keep cursor visible
@@ -229,33 +238,33 @@ export function PatternEditor() {
     }
   }, [cursor.row]);
 
-  const formatNote = (row: PatternRow) => {
-    if (!row.note) return '---';
-    return `${row.note.note}${row.note.octave}`;
+  const formatNote = (cell: TrackCell) => {
+    if (!cell.note) return '---';
+    return `${cell.note.note}${cell.note.octave}`;
   };
 
-  const formatInstrument = (row: PatternRow) => {
-    if (row.instrument === null) return '--';
-    return row.instrument.toString().padStart(2, '0');
+  const formatInstrument = (cell: TrackCell) => {
+    if (cell.instrument === null) return '--';
+    return cell.instrument.toString().padStart(2, '0');
   };
 
-  const formatVolume = (row: PatternRow) => {
-    if (row.volume === null) return '---';
-    return row.volume.toString().padStart(3, '0');
+  const formatVolume = (cell: TrackCell) => {
+    if (cell.volume === null) return '---';
+    return cell.volume.toString().padStart(3, '0');
   };
 
-  const formatPanning = (row: PatternRow) => {
-    if (row.panning === null) return '--';
-    return row.panning.toString(16).toUpperCase().padStart(2, '0');
+  const formatPanning = (cell: TrackCell) => {
+    if (cell.panning === null) return '--';
+    return cell.panning.toString(16).toUpperCase().padStart(2, '0');
   };
 
-  const formatDelay = (row: PatternRow) => {
-    if (row.delay === null) return '--';
-    return row.delay.toString(16).toUpperCase().padStart(2, '0');
+  const formatDelay = (cell: TrackCell) => {
+    if (cell.delay === null) return '--';
+    return cell.delay.toString(16).toUpperCase().padStart(2, '0');
   };
 
-  const formatEffect = (row: PatternRow) => {
-    return row.effect || '----';
+  const formatEffect = (cell: TrackCell) => {
+    return cell.effect || '----';
   };
 
   return (
@@ -265,6 +274,12 @@ export function PatternEditor() {
         <div className="flex items-center gap-4">
           <h2 className="text-sm font-bold">Pattern {pattern.id}</h2>
           <span className="text-xs text-gray-400">{pattern.name}</span>
+          <button
+            onClick={() => addTrack(currentPattern)}
+            className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded"
+          >
+            + Track
+          </button>
         </div>
         <div className="flex items-center gap-4 text-xs">
           <span
@@ -280,125 +295,164 @@ export function PatternEditor() {
             Row: {cursor.row.toString().padStart(2, '0')} / {pattern.length}
           </span>
           <span className="text-gray-400">
+            Track: {cursor.track + 1} / {pattern.numTracks}
+          </span>
+          <span className="text-gray-400">
             Octave: {currentOctave}
           </span>
         </div>
       </div>
 
       {/* Column headers */}
-      <div className="flex gap-2 px-4 py-2 bg-gray-800 border-b border-gray-600 text-xs text-gray-400">
-        <div className="w-8">ROW</div>
-        <div className="w-16">NOTE</div>
-        <div className="w-12">INST</div>
-        <div className="w-16">VOL</div>
-        <div className="w-12">PAN</div>
-        <div className="w-12">DLY</div>
-        <div className="w-20">EFFECT</div>
+      <div className="flex gap-1 px-4 py-2 bg-gray-800 border-b border-gray-600 text-xs text-gray-400 overflow-x-auto">
+        <div className="w-8 flex-shrink-0">ROW</div>
+        {Array.from({ length: pattern.numTracks }).map((_, trackIdx) => (
+          <div key={trackIdx} className="flex gap-1 border-l border-gray-700 pl-1">
+            <div className="w-14 cursor-pointer hover:text-white" onClick={() => toggleColumnCollapse(trackIdx, 'note')}>
+              {isColumnCollapsed(trackIdx, 'note') ? '> NOTE' : 'v NOTE'}
+            </div>
+            <div className="w-10 cursor-pointer hover:text-white" onClick={() => toggleColumnCollapse(trackIdx, 'instrument')}>
+              {isColumnCollapsed(trackIdx, 'instrument') ? '>' : 'v'} INST
+            </div>
+            <div className="w-12 cursor-pointer hover:text-white" onClick={() => toggleColumnCollapse(trackIdx, 'volume')}>
+              {isColumnCollapsed(trackIdx, 'volume') ? '>' : 'v'} VOL
+            </div>
+            <div className="w-10 cursor-pointer hover:text-white" onClick={() => toggleColumnCollapse(trackIdx, 'panning')}>
+              {isColumnCollapsed(trackIdx, 'panning') ? '>' : 'v'} PAN
+            </div>
+            <div className="w-10 cursor-pointer hover:text-white" onClick={() => toggleColumnCollapse(trackIdx, 'delay')}>
+              {isColumnCollapsed(trackIdx, 'delay') ? '>' : 'v'} DLY
+            </div>
+            <div className="w-16 cursor-pointer hover:text-white" onClick={() => toggleColumnCollapse(trackIdx, 'effect')}>
+              {isColumnCollapsed(trackIdx, 'effect') ? '>' : 'v'} FX
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Pattern rows */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-2"
+        className="flex-1 overflow-auto px-4 py-2"
       >
-        {pattern.rows.map((row, index) => {
-          const isCursorRow = cursor.row === index;
-          const isPlayRow = isPlaying && currentPlayRow === index;
+        {pattern.rows.map((row, rowIdx) => {
+          const isCursorRow = cursor.row === rowIdx;
+          const isPlayRow = isPlaying && currentPlayRow === rowIdx;
 
           return (
             <div
-              key={index}
-              data-row={index}
-              className={`flex gap-2 py-0.5 text-sm ${
+              key={rowIdx}
+              data-row={rowIdx}
+              className={`flex gap-1 py-0.5 text-sm ${
                 isCursorRow ? 'bg-gray-700' : ''
               } ${isPlayRow ? 'bg-blue-900' : ''}`}
             >
               {/* Row number */}
               <div
-                className={`w-8 text-right ${
-                  index % 16 === 0 ? 'text-yellow-400' : 'text-gray-500'
+                className={`w-8 flex-shrink-0 text-right ${
+                  rowIdx % 16 === 0 ? 'text-yellow-400' : 'text-gray-500'
                 }`}
               >
-                {index.toString(16).toUpperCase().padStart(2, '0')}
+                {rowIdx.toString(16).toUpperCase().padStart(2, '0')}
               </div>
 
-              {/* Note */}
-              <div
-                className={`w-16 ${
-                  isCursorRow && cursor.column === 'note'
-                    ? 'bg-blue-600 text-white'
-                    : row.note
-                      ? 'text-green-400'
-                      : 'text-gray-600'
-                }`}
-              >
-                {formatNote(row)}
-              </div>
+              {/* Track cells */}
+              {row.tracks.map((cell, trackIdx) => {
+                const isCursorTrack = isCursorRow && cursor.track === trackIdx;
+                return (
+                  <div key={trackIdx} className="flex gap-1 border-l border-gray-800 pl-1">
+                    {/* Note */}
+                    {!isColumnCollapsed(trackIdx, 'note') && (
+                      <div
+                        className={`w-14 ${
+                          isCursorTrack && cursor.column === 'note'
+                            ? 'bg-blue-600 text-white'
+                            : cell.note
+                              ? 'text-green-400'
+                              : 'text-gray-600'
+                        }`}
+                      >
+                        {formatNote(cell)}
+                      </div>
+                    )}
 
-              {/* Instrument */}
-              <div
-                className={`w-12 ${
-                  isCursorRow && cursor.column === 'instrument'
-                    ? 'bg-blue-600 text-white'
-                    : row.instrument !== null
-                      ? 'text-cyan-400'
-                      : 'text-gray-600'
-                }`}
-              >
-                {formatInstrument(row)}
-              </div>
+                    {/* Instrument */}
+                    {!isColumnCollapsed(trackIdx, 'instrument') && (
+                      <div
+                        className={`w-10 ${
+                          isCursorTrack && cursor.column === 'instrument'
+                            ? 'bg-blue-600 text-white'
+                            : cell.instrument !== null
+                              ? 'text-cyan-400'
+                              : 'text-gray-600'
+                        }`}
+                      >
+                        {formatInstrument(cell)}
+                      </div>
+                    )}
 
-              {/* Volume */}
-              <div
-                className={`w-16 ${
-                  isCursorRow && cursor.column === 'volume'
-                    ? 'bg-blue-600 text-white'
-                    : row.volume !== null
-                      ? 'text-yellow-400'
-                      : 'text-gray-600'
-                }`}
-              >
-                {formatVolume(row)}
-              </div>
+                    {/* Volume */}
+                    {!isColumnCollapsed(trackIdx, 'volume') && (
+                      <div
+                        className={`w-12 ${
+                          isCursorTrack && cursor.column === 'volume'
+                            ? 'bg-blue-600 text-white'
+                            : cell.volume !== null
+                              ? 'text-yellow-400'
+                              : 'text-gray-600'
+                        }`}
+                      >
+                        {formatVolume(cell)}
+                      </div>
+                    )}
 
-              {/* Panning */}
-              <div
-                className={`w-12 ${
-                  isCursorRow && cursor.column === 'panning'
-                    ? 'bg-blue-600 text-white'
-                    : row.panning !== null
-                      ? 'text-purple-400'
-                      : 'text-gray-600'
-                }`}
-              >
-                {formatPanning(row)}
-              </div>
+                    {/* Panning */}
+                    {!isColumnCollapsed(trackIdx, 'panning') && (
+                      <div
+                        className={`w-10 ${
+                          isCursorTrack && cursor.column === 'panning'
+                            ? 'bg-blue-600 text-white'
+                            : cell.panning !== null
+                              ? 'text-purple-400'
+                              : 'text-gray-600'
+                        }`}
+                      >
+                        {formatPanning(cell)}
+                      </div>
+                    )}
 
-              {/* Delay */}
-              <div
-                className={`w-12 ${
-                  isCursorRow && cursor.column === 'delay'
-                    ? 'bg-blue-600 text-white'
-                    : row.delay !== null
-                      ? 'text-orange-400'
-                      : 'text-gray-600'
-                }`}
-              >
-                {formatDelay(row)}
-              </div>
+                    {/* Delay */}
+                    {!isColumnCollapsed(trackIdx, 'delay') && (
+                      <div
+                        className={`w-10 ${
+                          isCursorTrack && cursor.column === 'delay'
+                            ? 'bg-blue-600 text-white'
+                            : cell.delay !== null
+                              ? 'text-orange-400'
+                              : 'text-gray-600'
+                        }`}
+                      >
+                        {formatDelay(cell)}
+                      </div>
+                    )}
 
-              {/* Effect */}
-              <div
-                className={`w-20 ${
-                  isCursorRow && cursor.column === 'effect'
-                    ? 'bg-blue-600 text-white'
-                    : row.effect
-                      ? 'text-magenta-400'
-                      : 'text-gray-600'
-                }`}
-              >
-                {formatEffect(row)}
-              </div>
+                    {/* Effect */}
+                    {!isColumnCollapsed(trackIdx, 'effect') && (
+                      <div
+                        className={`w-16 ${
+                          isCursorTrack && cursor.column === 'effect'
+                            ? 'bg-blue-600 text-white'
+                            : cell.effect
+                              ? 'text-magenta-400'
+                              : 'text-gray-600'
+                        }`}
+                      >
+                        {formatEffect(cell)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           );
         })}
