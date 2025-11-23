@@ -20,6 +20,8 @@ export function PatternEditor() {
     setCurrentNote,
     setCurrentInstrument,
     setCurrentVolume,
+    setCurrentPanning,
+    setCurrentDelay,
     clearRow,
   } = useTrackerStore();
 
@@ -45,8 +47,8 @@ export function PatternEditor() {
             moveCursor(action);
           }
         }
-        // Delete key clears current row
-        if (e.key === 'Delete' || e.key === 'Backspace') {
+        // 'x' or Delete key clears current row
+        if (e.key === 'x' || e.key === 'Delete' || e.key === 'Backspace') {
           clearRow(cursor.row);
         }
       } else if (mode === 'insert') {
@@ -102,6 +104,36 @@ export function PatternEditor() {
             setCurrentVolume(null);
           }
         }
+
+        // Handle panning input (hex: 00-FF, 80=center)
+        if (cursor.column === 'panning') {
+          const hexChars = '0123456789abcdefABCDEF';
+          if (hexChars.includes(e.key)) {
+            const currentRow = pattern.rows[cursor.row];
+            const currentPan = currentRow.panning || 0;
+            const currentHex = currentPan.toString(16).toUpperCase().padStart(2, '0');
+            const newHex = (currentHex.slice(1) + e.key.toUpperCase()).slice(0, 2);
+            const newPan = parseInt(newHex, 16);
+            setCurrentPanning(newPan);
+          } else if (e.key === 'Delete' || e.key === 'Backspace') {
+            setCurrentPanning(null);
+          }
+        }
+
+        // Handle delay input (hex: 00-FF)
+        if (cursor.column === 'delay') {
+          const hexChars = '0123456789abcdefABCDEF';
+          if (hexChars.includes(e.key)) {
+            const currentRow = pattern.rows[cursor.row];
+            const currentDel = currentRow.delay || 0;
+            const currentHex = currentDel.toString(16).toUpperCase().padStart(2, '0');
+            const newHex = (currentHex.slice(1) + e.key.toUpperCase()).slice(0, 2);
+            const newDel = parseInt(newHex, 16);
+            setCurrentDelay(newDel);
+          } else if (e.key === 'Delete' || e.key === 'Backspace') {
+            setCurrentDelay(null);
+          }
+        }
       }
     };
 
@@ -118,6 +150,8 @@ export function PatternEditor() {
     setCurrentNote,
     setCurrentInstrument,
     setCurrentVolume,
+    setCurrentPanning,
+    setCurrentDelay,
     clearRow,
   ]);
 
@@ -146,6 +180,16 @@ export function PatternEditor() {
   const formatVolume = (row: PatternRow) => {
     if (row.volume === null) return '---';
     return row.volume.toString().padStart(3, '0');
+  };
+
+  const formatPanning = (row: PatternRow) => {
+    if (row.panning === null) return '--';
+    return row.panning.toString(16).toUpperCase().padStart(2, '0');
+  };
+
+  const formatDelay = (row: PatternRow) => {
+    if (row.delay === null) return '--';
+    return row.delay.toString(16).toUpperCase().padStart(2, '0');
   };
 
   const formatEffect = (row: PatternRow) => {
@@ -182,6 +226,8 @@ export function PatternEditor() {
         <div className="w-16">NOTE</div>
         <div className="w-12">INST</div>
         <div className="w-16">VOL</div>
+        <div className="w-12">PAN</div>
+        <div className="w-12">DLY</div>
         <div className="w-20">EFFECT</div>
       </div>
 
@@ -250,6 +296,32 @@ export function PatternEditor() {
                 {formatVolume(row)}
               </div>
 
+              {/* Panning */}
+              <div
+                className={`w-12 ${
+                  isCursorRow && cursor.column === 'panning'
+                    ? 'bg-blue-600 text-white'
+                    : row.panning !== null
+                      ? 'text-purple-400'
+                      : 'text-gray-600'
+                }`}
+              >
+                {formatPanning(row)}
+              </div>
+
+              {/* Delay */}
+              <div
+                className={`w-12 ${
+                  isCursorRow && cursor.column === 'delay'
+                    ? 'bg-blue-600 text-white'
+                    : row.delay !== null
+                      ? 'text-orange-400'
+                      : 'text-gray-600'
+                }`}
+              >
+                {formatDelay(row)}
+              </div>
+
               {/* Effect */}
               <div
                 className={`w-20 ${
@@ -271,7 +343,7 @@ export function PatternEditor() {
       <div className="px-4 py-2 bg-gray-800 border-t border-gray-700 text-xs text-gray-400">
         {mode === 'normal' ? (
           <span>
-            <kbd>h/j/k/l</kbd> or arrows to move • <kbd>i</kbd> to insert • <kbd>Del</kbd> to clear
+            <kbd>h/j/k/l</kbd> or arrows to move • <kbd>i</kbd> to insert • <kbd>x</kbd> to delete
           </span>
         ) : (
           <span>

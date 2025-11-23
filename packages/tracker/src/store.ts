@@ -30,6 +30,8 @@ interface TrackerActions {
   setNote: (row: number, note: Note | null) => void;
   setInstrument: (row: number, instrument: number | null) => void;
   setVolume: (row: number, volume: number | null) => void;
+  setPanning: (row: number, panning: number | null) => void;
+  setDelay: (row: number, delay: number | null) => void;
   setEffect: (row: number, effect: string | null) => void;
   clearRow: (row: number) => void;
 
@@ -37,6 +39,8 @@ interface TrackerActions {
   setCurrentNote: (note: Note | null) => void;
   setCurrentInstrument: (instrument: number | null) => void;
   setCurrentVolume: (volume: number | null) => void;
+  setCurrentPanning: (panning: number | null) => void;
+  setCurrentDelay: (delay: number | null) => void;
   setCurrentEffect: (effect: string | null) => void;
 
   // Instrument management
@@ -65,6 +69,8 @@ const createEmptyPattern = (id: string, length: number = 64): Pattern => ({
     note: null,
     instrument: null,
     volume: null,
+    panning: null,
+    delay: null,
     effect: null,
   })),
 });
@@ -179,6 +185,30 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
       return { song: newSong };
     }),
 
+  setPanning: (row, panning) =>
+    set((state) => {
+      const newSong = { ...state.song };
+      const pattern = { ...newSong.patterns[state.currentPattern] };
+      const rows = [...pattern.rows];
+      rows[row] = { ...rows[row], panning };
+      pattern.rows = rows;
+      newSong.patterns = [...newSong.patterns];
+      newSong.patterns[state.currentPattern] = pattern;
+      return { song: newSong };
+    }),
+
+  setDelay: (row, delay) =>
+    set((state) => {
+      const newSong = { ...state.song };
+      const pattern = { ...newSong.patterns[state.currentPattern] };
+      const rows = [...pattern.rows];
+      rows[row] = { ...rows[row], delay };
+      pattern.rows = rows;
+      newSong.patterns = [...newSong.patterns];
+      newSong.patterns[state.currentPattern] = pattern;
+      return { song: newSong };
+    }),
+
   setEffect: (row, effect) =>
     set((state) => {
       const newSong = { ...state.song };
@@ -200,6 +230,8 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
         note: null,
         instrument: null,
         volume: null,
+        panning: null,
+        delay: null,
         effect: null,
       };
       pattern.rows = rows;
@@ -222,6 +254,16 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
   setCurrentVolume: (volume) => {
     const { cursor } = get();
     get().setVolume(cursor.row, volume);
+  },
+
+  setCurrentPanning: (panning) => {
+    const { cursor } = get();
+    get().setPanning(cursor.row, panning);
+  },
+
+  setCurrentDelay: (delay) => {
+    const { cursor } = get();
+    get().setDelay(cursor.row, delay);
   },
 
   setCurrentEffect: (effect) => {

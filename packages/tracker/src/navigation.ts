@@ -4,7 +4,7 @@
 
 import type { CursorPosition, ColumnType, EditorMode } from './types';
 
-export const COLUMNS: ColumnType[] = ['note', 'instrument', 'volume', 'effect'];
+export const COLUMNS: ColumnType[] = ['note', 'instrument', 'volume', 'panning', 'delay', 'effect'];
 
 export interface NavigationAction {
   type:
