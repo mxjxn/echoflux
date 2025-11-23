@@ -11,7 +11,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@echoflux/tracker": "*",
+    "@echoflux/tracker": "workspace:*",
     "@prisma/client": "^5.7.1",
     "nanoid": "^5.1.6",
     "next": "^14.0.4",

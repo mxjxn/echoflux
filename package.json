@@ -2,10 +2,6 @@
   "name": "echoflux",
   "version": "0.1.0",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
@@ -21,5 +17,5 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "packageManager": "npm@10.2.4"
+  "packageManager": "pnpm@9.1.4"
 }

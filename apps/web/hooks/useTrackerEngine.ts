@@ -3,7 +3,8 @@ import { useTrackerStore } from '@echoflux/tracker';
 import type { Pattern, Instrument } from '@echoflux/tracker';
 
 interface SuperSonicInstance {
-  send: (msg: string) => void;
+  send: (address: string, ...args: any[]) => Promise<void>;
+  audioContext?: AudioContext;
 }
 
 interface UseTrackerEngineOptions {
@@ -52,23 +53,39 @@ export function useTrackerEngine({ sonic, onRowChange }: UseTrackerEngineOptions
       const amp = (velocity / 127) * (instrument.params.amp || 0.8);
       const release = instrument.params.release || 0.3;
 
-      // Build SuperSonic OSC message
-      let msg = `["/s_new", "${instrument.synthName}", -1, 0, 0`;
-      msg += `, "note", ${midiNote}`;
-      msg += `, "amp", ${amp}`;
-      msg += `, "release", ${release}`;
+      // Build SuperSonic OSC message arguments
+      // Format: send(address, ...args) where args are key-value pairs
+      // SuperSonic expects full synthdef name like 'sonic-pi-beep'
+      const synthDefName = `sonic-pi-${instrument.synthName}`;
+      const args: any[] = [
+        synthDefName, // synth def name (full name with sonic-pi- prefix)
+        -1, // node ID (-1 = auto-assign)
+        0,  // add action (0 = add to head)
+        0,  // target node ID
+        'note', midiNote,
+        'amp', amp,
+        'release', release,
+      ];
 
       // Add additional params if available
       if (instrument.params.cutoff !== undefined) {
-        msg += `, "cutoff", ${instrument.params.cutoff}`;
+        args.push('cutoff', instrument.params.cutoff);
       }
       if (instrument.params.res !== undefined) {
-        msg += `, "res", ${instrument.params.res}`;
+        args.push('res', instrument.params.res);
       }
 
-      msg += `]`;
-
-      sonic.send(msg);
+      // Send OSC message: /s_new with arguments
+      console.log('[useTrackerEngine] Sending note:', {
+        synthDefName,
+        midiNote,
+        amp,
+        release,
+        args,
+      });
+      sonic.send('/s_new', ...args).catch((err) => {
+        console.error('[useTrackerEngine] Error sending OSC message:', err);
+      });
     };
 
     const tick = () => {
@@ -114,7 +131,25 @@ export function useTrackerEngine({ sonic, onRowChange }: UseTrackerEngineOptions
     };
   }, [isPlaying, sonic, song, pattern, currentPattern, setCurrentPlayRow, onRowChange]);
 
-  const play = () => {
+  const play = async () => {
+    // Resume audio context if suspended (browsers require user interaction)
+    if (sonic) {
+      // Access audioContext through the instance (it's a getter property)
+      const audioCtx = (sonic as any).audioContext;
+      if (audioCtx && audioCtx.state === 'suspended') {
+        console.log('[useTrackerEngine] Resuming audio context...');
+        try {
+          await audioCtx.resume();
+          console.log('[useTrackerEngine] Audio context resumed, state:', audioCtx.state);
+        } catch (err) {
+          console.error('[useTrackerEngine] Failed to resume audio context:', err);
+        }
+      } else if (audioCtx) {
+        console.log('[useTrackerEngine] Audio context state:', audioCtx.state);
+      } else {
+        console.warn('[useTrackerEngine] Audio context not available');
+      }
+    }
     setPlaying(true);
     setCurrentPlayRow(0);
   };

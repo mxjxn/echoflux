@@ -5,10 +5,11 @@ import { useTrackerStore } from '@echoflux/tracker';
 import type { Instrument } from '@echoflux/tracker';
 
 // Available SuperSonic synths (from music-engine package)
+// Note: 'sine' doesn't exist, use 'mod_sine' instead
 const AVAILABLE_SYNTHS = [
   'beep',
   'saw',
-  'sine',
+  'mod_sine', // Use mod_sine instead of sine (sine doesn't exist)
   'square',
   'tri',
   'pulse',
@@ -20,7 +21,6 @@ const AVAILABLE_SYNTHS = [
   'mod_fm',
   'mod_saw',
   'mod_dsaw',
-  'mod_sine',
   'mod_tri',
   'mod_pulse',
   'tb303',

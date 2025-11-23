@@ -3,6 +3,10 @@ node_modules
 .pnp
 .pnp.js
 
+# Lock files (pnpm-lock.yaml should be committed, package-lock.json should not)
+package-lock.json
+yarn.lock
+
 # Testing
 coverage
 
