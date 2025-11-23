@@ -164,7 +164,7 @@ export default function Home() {
                 </li>
                 <li className="flex items-start">
                   <span className="text-primary mr-2">•</span>
-                  <span>Low-latency pattern-based sync (&lt;50ms)</span>
+                  <span>Low-latency pattern-based sync ({"<"}50ms)</span>
                 </li>
                 <li className="flex items-start">
                   <span className="text-primary mr-2">•</span>
