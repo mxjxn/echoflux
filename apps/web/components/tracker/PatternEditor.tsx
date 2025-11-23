@@ -36,7 +36,42 @@ export function PatternEditor() {
     removeTrack,
     toggleColumnCollapse,
     isColumnCollapsed,
+    exportSong,
+    importSong,
   } = useTrackerStore();
+
+  const handleExport = () => {
+    const json = exportSong();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${song.name}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const json = event.target?.result as string;
+            importSong(json);
+          } catch (err) {
+            alert('Failed to import song: ' + (err as Error).message);
+          }
+        };
+        reader.readAsText(file);
+      }
+    };
+    input.click();
+  };
 
   const pattern = song.patterns[currentPattern];
 
@@ -224,6 +259,8 @@ export function PatternEditor() {
     removeTrack,
     toggleColumnCollapse,
     isColumnCollapsed,
+    exportSong,
+    importSong,
   ]);
 
   // Auto-scroll to keep cursor visible
@@ -271,7 +308,7 @@ export function PatternEditor() {
     <div className="flex flex-col h-full bg-gray-900 text-gray-100 font-mono">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <h2 className="text-sm font-bold">Pattern {pattern.id}</h2>
           <span className="text-xs text-gray-400">{pattern.name}</span>
           <button
@@ -279,6 +316,18 @@ export function PatternEditor() {
             className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded"
           >
             + Track
+          </button>
+          <button
+            onClick={handleExport}
+            className="px-2 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded"
+          >
+            Export
+          </button>
+          <button
+            onClick={handleImport}
+            className="px-2 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded"
+          >
+            Import
           </button>
         </div>
         <div className="flex items-center gap-4 text-xs">

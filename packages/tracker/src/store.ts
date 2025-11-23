@@ -78,6 +78,10 @@ interface TrackerActions {
   // Column collapse
   toggleColumnCollapse: (track: number, column: ColumnType) => void;
   isColumnCollapsed: (track: number, column: ColumnType) => boolean;
+
+  // Export/Import
+  exportSong: () => string;
+  importSong: (json: string) => void;
 }
 
 const createEmptyTrackCell = (): TrackCell => ({
@@ -487,5 +491,29 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
   isColumnCollapsed: (track, column) => {
     const state = get();
     return state.collapsedColumns[track]?.has(column) || false;
+  },
+
+  // Export/Import
+  exportSong: () => {
+    const state = get();
+    return JSON.stringify(state.song, null, 2);
+  },
+
+  importSong: (json) => {
+    try {
+      const importedSong = JSON.parse(json);
+      // Basic validation
+      if (!importedSong.patterns || !importedSong.instruments) {
+        throw new Error('Invalid song format');
+      }
+      set({
+        song: importedSong,
+        currentPattern: 0,
+        cursor: { row: 0, pattern: 0, track: 0, column: 'note' },
+      });
+    } catch (err) {
+      console.error('Failed to import song:', err);
+      throw err;
+    }
   },
 }));
