@@ -27,6 +27,8 @@ export interface PatternRow {
   note: Note | null;
   instrument: number | null; // Index into instrument list
   volume: number | null; // 0-127
+  panning: number | null; // 0-255, 128=center (00-FF in hex)
+  delay: number | null; // 0-255 (00-FF in hex)
   effect: string | null; // Effect command (e.g., "0100" for arpeggio)
 }
 
@@ -61,7 +63,7 @@ export interface TrackerSong {
 
 export type EditorMode = 'normal' | 'insert';
 
-export type ColumnType = 'note' | 'instrument' | 'volume' | 'effect';
+export type ColumnType = 'note' | 'instrument' | 'volume' | 'panning' | 'delay' | 'effect';
 
 export interface CursorPosition {
   row: number;
@@ -77,4 +79,6 @@ export interface TrackerState {
   isPlaying: boolean;
   currentPlayRow: number;
   selectedInstrument: number;
+  clipboard: PatternRow | null;
+  currentOctave: number; // 0-8
 }

@@ -30,6 +30,8 @@ interface TrackerActions {
   setNote: (row: number, note: Note | null) => void;
   setInstrument: (row: number, instrument: number | null) => void;
   setVolume: (row: number, volume: number | null) => void;
+  setPanning: (row: number, panning: number | null) => void;
+  setDelay: (row: number, delay: number | null) => void;
   setEffect: (row: number, effect: string | null) => void;
   clearRow: (row: number) => void;
 
@@ -37,12 +39,19 @@ interface TrackerActions {
   setCurrentNote: (note: Note | null) => void;
   setCurrentInstrument: (instrument: number | null) => void;
   setCurrentVolume: (volume: number | null) => void;
+  setCurrentPanning: (panning: number | null) => void;
+  setCurrentDelay: (delay: number | null) => void;
   setCurrentEffect: (effect: string | null) => void;
 
   // Instrument management
   selectInstrument: (index: number) => void;
   addInstrument: (instrument: Instrument) => void;
   updateInstrument: (index: number, updates: Partial<Instrument>) => void;
+
+  // Octave control
+  setCurrentOctave: (octave: number) => void;
+  incrementOctave: () => void;
+  decrementOctave: () => void;
 
   // Pattern management
   setCurrentPattern: (index: number) => void;
@@ -55,6 +64,12 @@ interface TrackerActions {
   // Song management
   setBpm: (bpm: number) => void;
   setSongName: (name: string) => void;
+
+  // Clipboard operations
+  copyRow: (row: number) => void;
+  pasteRow: (row: number) => void;
+  insertRow: (row: number) => void;
+  deleteRow: (row: number) => void;
 }
 
 const createEmptyPattern = (id: string, length: number = 64): Pattern => ({
@@ -65,6 +80,8 @@ const createEmptyPattern = (id: string, length: number = 64): Pattern => ({
     note: null,
     instrument: null,
     volume: null,
+    panning: null,
+    delay: null,
     effect: null,
   })),
 });
@@ -118,6 +135,8 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
   isPlaying: false,
   currentPlayRow: 0,
   selectedInstrument: 0,
+  clipboard: null,
+  currentOctave: 4,
 
   // Mode actions
   setMode: (mode) => set({ mode }),
@@ -179,6 +198,30 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
       return { song: newSong };
     }),
 
+  setPanning: (row, panning) =>
+    set((state) => {
+      const newSong = { ...state.song };
+      const pattern = { ...newSong.patterns[state.currentPattern] };
+      const rows = [...pattern.rows];
+      rows[row] = { ...rows[row], panning };
+      pattern.rows = rows;
+      newSong.patterns = [...newSong.patterns];
+      newSong.patterns[state.currentPattern] = pattern;
+      return { song: newSong };
+    }),
+
+  setDelay: (row, delay) =>
+    set((state) => {
+      const newSong = { ...state.song };
+      const pattern = { ...newSong.patterns[state.currentPattern] };
+      const rows = [...pattern.rows];
+      rows[row] = { ...rows[row], delay };
+      pattern.rows = rows;
+      newSong.patterns = [...newSong.patterns];
+      newSong.patterns[state.currentPattern] = pattern;
+      return { song: newSong };
+    }),
+
   setEffect: (row, effect) =>
     set((state) => {
       const newSong = { ...state.song };
@@ -200,6 +243,8 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
         note: null,
         instrument: null,
         volume: null,
+        panning: null,
+        delay: null,
         effect: null,
       };
       pattern.rows = rows;
@@ -222,6 +267,16 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
   setCurrentVolume: (volume) => {
     const { cursor } = get();
     get().setVolume(cursor.row, volume);
+  },
+
+  setCurrentPanning: (panning) => {
+    const { cursor } = get();
+    get().setPanning(cursor.row, panning);
+  },
+
+  setCurrentDelay: (delay) => {
+    const { cursor } = get();
+    get().setDelay(cursor.row, delay);
   },
 
   setCurrentEffect: (effect) => {
@@ -252,6 +307,13 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
       };
     }),
 
+  // Octave control
+  setCurrentOctave: (octave) => set({ currentOctave: Math.max(0, Math.min(8, octave)) }),
+  incrementOctave: () =>
+    set((state) => ({ currentOctave: Math.min(8, state.currentOctave + 1) })),
+  decrementOctave: () =>
+    set((state) => ({ currentOctave: Math.max(0, state.currentOctave - 1) })),
+
   // Pattern management
   setCurrentPattern: (index) =>
     set({
@@ -281,4 +343,69 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
     set((state) => ({
       song: { ...state.song, name },
     })),
+
+  // Clipboard operations
+  copyRow: (row) =>
+    set((state) => {
+      const pattern = state.song.patterns[state.currentPattern];
+      const rowData = { ...pattern.rows[row] };
+      return { clipboard: rowData };
+    }),
+
+  pasteRow: (row) =>
+    set((state) => {
+      if (!state.clipboard) return state;
+      const newSong = { ...state.song };
+      const pattern = { ...newSong.patterns[state.currentPattern] };
+      const rows = [...pattern.rows];
+      rows[row] = { ...state.clipboard };
+      pattern.rows = rows;
+      newSong.patterns = [...newSong.patterns];
+      newSong.patterns[state.currentPattern] = pattern;
+      return { song: newSong };
+    }),
+
+  insertRow: (row) =>
+    set((state) => {
+      const newSong = { ...state.song };
+      const pattern = { ...newSong.patterns[state.currentPattern] };
+      const rows = [...pattern.rows];
+      // Insert empty row at position
+      rows.splice(row, 0, {
+        note: null,
+        instrument: null,
+        volume: null,
+        panning: null,
+        delay: null,
+        effect: null,
+      });
+      // Remove last row to maintain pattern length
+      rows.pop();
+      pattern.rows = rows;
+      newSong.patterns = [...newSong.patterns];
+      newSong.patterns[state.currentPattern] = pattern;
+      return { song: newSong };
+    }),
+
+  deleteRow: (row) =>
+    set((state) => {
+      const newSong = { ...state.song };
+      const pattern = { ...newSong.patterns[state.currentPattern] };
+      const rows = [...pattern.rows];
+      // Remove row at position
+      rows.splice(row, 1);
+      // Add empty row at end to maintain pattern length
+      rows.push({
+        note: null,
+        instrument: null,
+        volume: null,
+        panning: null,
+        delay: null,
+        effect: null,
+      });
+      pattern.rows = rows;
+      newSong.patterns = [...newSong.patterns];
+      newSong.patterns[state.currentPattern] = pattern;
+      return { song: newSong };
+    }),
 }));
