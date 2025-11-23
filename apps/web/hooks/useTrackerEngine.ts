@@ -108,15 +108,17 @@ export function useTrackerEngine({ sonic, onRowChange }: UseTrackerEngineOptions
           onRowChange(currentRow);
         }
 
-        // Play notes in current row
+        // Play notes in current row from all tracks
         const row = pattern.rows[currentRow];
-        if (row.note && row.instrument !== null) {
-          const instrument = song.instruments[row.instrument];
-          if (instrument && row.note.note !== '---' && row.note.note !== 'OFF') {
-            const velocity = row.volume || 100;
-            playNote(row.note.note, row.note.octave, instrument, velocity);
+        row.tracks.forEach((trackCell) => {
+          if (trackCell.note && trackCell.instrument !== null) {
+            const instrument = song.instruments[trackCell.instrument];
+            if (instrument && trackCell.note.note !== '---' && trackCell.note.note !== 'OFF') {
+              const velocity = trackCell.volume || 100;
+              playNote(trackCell.note.note, trackCell.note.octave, instrument, velocity);
+            }
           }
-        }
+        });
       }
 
       animationFrameRef.current = requestAnimationFrame(tick);

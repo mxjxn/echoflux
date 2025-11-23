@@ -14,6 +14,8 @@ export interface NavigationAction {
     | 'MOVE_RIGHT'
     | 'MOVE_NEXT_COLUMN'
     | 'MOVE_PREV_COLUMN'
+    | 'MOVE_NEXT_TRACK'
+    | 'MOVE_PREV_TRACK'
     | 'PAGE_UP'
     | 'PAGE_DOWN'
     | 'HOME'
@@ -28,7 +30,8 @@ export function handleNavigation(
   cursor: CursorPosition,
   action: NavigationAction,
   maxRows: number,
-  maxPatterns: number
+  maxPatterns: number,
+  maxTracks: number
 ): CursorPosition {
   const newCursor = { ...cursor };
 
@@ -57,6 +60,14 @@ export function handleNavigation(
       }
       break;
 
+    case 'MOVE_NEXT_TRACK':
+      newCursor.track = Math.min(maxTracks - 1, cursor.track + 1);
+      break;
+
+    case 'MOVE_PREV_TRACK':
+      newCursor.track = Math.max(0, cursor.track - 1);
+      break;
+
     case 'PAGE_UP':
       newCursor.row = Math.max(0, cursor.row - PAGE_SIZE);
       break;
@@ -81,6 +92,14 @@ export function parseNormalModeKey(
   key: string,
   shiftKey: boolean
 ): NavigationAction | null {
+  // Track navigation with Shift+H/L or Shift+Arrow
+  if (shiftKey && (key === 'H' || key === 'ArrowLeft')) {
+    return { type: 'MOVE_PREV_TRACK' };
+  }
+  if (shiftKey && (key === 'L' || key === 'ArrowRight')) {
+    return { type: 'MOVE_NEXT_TRACK' };
+  }
+
   // Vim-style navigation
   if (key === 'h' || key === 'ArrowLeft') {
     return { type: 'MOVE_LEFT' };

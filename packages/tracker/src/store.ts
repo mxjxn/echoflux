@@ -166,7 +166,8 @@ export const useTrackerStore = create<TrackerState & TrackerActions>((set, get) 
       state.cursor,
       action,
       pattern.length,
-      state.song.patterns.length
+      state.song.patterns.length,
+      pattern.numTracks
     );
     set({ cursor: newCursor });
   },

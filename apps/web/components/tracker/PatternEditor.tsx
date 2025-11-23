@@ -462,12 +462,11 @@ export function PatternEditor() {
       <div className="px-4 py-2 bg-gray-800 border-t border-gray-700 text-xs text-gray-400">
         {mode === 'normal' ? (
           <span>
-            <kbd>h/j/k/l</kbd> move • <kbd>i</kbd> insert • <kbd>x</kbd> delete • <kbd>yy</kbd> copy • <kbd>p</kbd> paste • <kbd>o</kbd> insert row • <kbd>dd</kbd> delete row • <kbd>*//</kbd> octave +/-
+            <kbd>h/j/k/l</kbd> move • <kbd>Shift+H/L</kbd> track • <kbd>i</kbd> insert • <kbd>x</kbd> delete • <kbd>yy</kbd> copy • <kbd>p</kbd> paste • <kbd>o</kbd> insert row • <kbd>dd</kbd> delete row • <kbd>*//</kbd> octave
           </span>
         ) : (
           <span>
-            Type notes (QWERTY keys) • <kbd>Esc</kbd> to exit insert mode • <kbd>Tab</kbd> to next
-            column
+            Type notes (QWERTY keys) • <kbd>Esc</kbd> to exit insert mode • <kbd>Tab</kbd> to next column
           </span>
         )}
       </div>
